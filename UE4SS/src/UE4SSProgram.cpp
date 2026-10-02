@@ -614,6 +614,12 @@ namespace RC
 
         // Version override from ini file
         {
+            Unreal::Version::PointerHashOverride = settings_manager.EngineVersionOverride.PointerHash;
+            if (Unreal::Version::PointerHashOverride != Unreal::PointerHashAlgorithm::Auto)
+            {
+                constexpr const CharType* names[] = {STR("Auto"), STR("HashCombine"), STR("Murmur32"), STR("Murmur64")};
+                Output::send(STR("[Unreal] Pointer hash override: {}\n"), names[static_cast<size_t>(Unreal::Version::PointerHashOverride)]);
+            }
             int64_t major_version = settings_manager.EngineVersionOverride.MajorVersion;
             int64_t minor_version = settings_manager.EngineVersionOverride.MinorVersion;
 
@@ -762,10 +768,24 @@ namespace RC
                 });
 
                 Output::send<Color::Blue>(STR("UStruct\n"));
-                retrieve_vtable_layout_from_ini(STR("UStruct"), [&](uint32_t index, File::StringType& item) {
+                uint32_t ustruct_size = retrieve_vtable_layout_from_ini(STR("UStruct"), [&](uint32_t index, File::StringType& item) {
                     uint32_t offset = calculate_virtual_function_offset(index, uobjectbase_size, uobjectbaseutility_size, uobject_size, ufield_size);
                     Output::send(STR("UStruct::{} = 0x{:X}\n"), item, offset);
                     Unreal::UStruct::VTableLayoutMap.emplace(item, offset);
+                });
+
+                Output::send<Color::Blue>(STR("UClass\n"));
+                retrieve_vtable_layout_from_ini(STR("UClass"), [&](uint32_t index, File::StringType& item) {
+                    uint32_t offset = calculate_virtual_function_offset(index, uobjectbase_size, uobjectbaseutility_size, uobject_size, ufield_size, ustruct_size);
+                    Output::send(STR("UClass::{} = 0x{:X}\n"), item, offset);
+                    Unreal::UClass::VTableLayoutMap.emplace(item, offset);
+                });
+
+                Output::send<Color::Blue>(STR("UGameViewportClient\n"));
+                retrieve_vtable_layout_from_ini(STR("UGameViewportClient"), [&](uint32_t index, File::StringType& item) {
+                    uint32_t offset = calculate_virtual_function_offset(index, uobjectbase_size, uobjectbaseutility_size, uobject_size);
+                    Output::send(STR("UGameViewportClient::{} = 0x{:X}\n"), item, offset);
+                    Unreal::UGameViewportClient::VTableLayoutMap.emplace(item, offset);
                 });
 
                 Output::send<Color::Blue>(STR("FOutputDevice\n"));
@@ -801,16 +821,11 @@ namespace RC
                 Output::send<Color::Blue>(STR("AGameMode\n"));
                 retrieve_vtable_layout_from_ini(STR("AGameMode"), [&](uint32_t index, File::StringType& item) {
                     uint32_t offset = calculate_virtual_function_offset(index,
-                                                                        Unreal::Version::IsAtLeast(4, 14)
-                                                                        ? uobjectbase_size,
+                                                                        uobjectbase_size,
                                                                         uobjectbaseutility_size,
                                                                         uobject_size,
                                                                         aactor_size,
-                                                                        agamemodebase_size
-                                                                        : uobjectbase_size,
-                                                                        uobjectbaseutility_size,
-                                                                        uobject_size,
-                                                                        aactor_size);
+                                                                        Unreal::Version::IsAtLeast(4, 14) ? agamemodebase_size : 0);
                     Output::send(STR("AGameMode::{} = 0x{:X}\n"), item, offset);
                     Unreal::AGameMode::VTableLayoutMap.emplace(item, offset);
                 });
@@ -831,7 +846,7 @@ namespace RC
 
                 Output::send<Color::Blue>(STR("UDataTable\n"));
                 retrieve_vtable_layout_from_ini(STR("UDataTable"), [&](uint32_t index, File::StringType& item) {
-                    uint32_t offset = calculate_virtual_function_offset(index, uobjectbase_size, uobjectbaseutility_size, uobject_size, uplayer_size);
+                    uint32_t offset = calculate_virtual_function_offset(index, uobjectbase_size, uobjectbaseutility_size, uobject_size);
                     Output::send(STR("UDataTable::{} = 0x{:X}\n"), item, offset);
                     Unreal::UDataTable::VTableLayoutMap.emplace(item, offset);
                 });
